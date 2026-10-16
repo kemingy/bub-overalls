@@ -1,0 +1,49 @@
+[project]
+name = "bub-sandbox"
+version = "0.1.0"
+description = "Experimental libkrun execution environments for Bub"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = ["bub>=0.5.2.dev4", "typer>=0.24"]
+
+[project.entry-points.bub]
+sandbox = "bub_sandbox.plugin"
+
+[project.scripts]
+bub-sandbox = "bub_sandbox.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=9", "pytest-asyncio>=1", "ruff>=0.15", "mypy>=1.20"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bub_sandbox"]
+
+[tool.uv.sources]
+bub = { path = "../bub", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["vm: requires a built helper and guest image"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["bub.*"]
+ignore_missing_imports = true
