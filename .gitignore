@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Overalls
+.venv/
+*.pyc
+.DS_Store
+src/bub_overalls/__version__.py
+.isaac/
