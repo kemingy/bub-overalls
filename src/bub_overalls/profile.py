@@ -48,6 +48,14 @@ def _active_developer_path() -> Path | None:
     return path if path.is_dir() else None
 
 
+def _xcode_shared_frameworks_path(developer_path: Path) -> Path | None:
+    contents = developer_path.parent
+    if contents.name != "Contents" or contents.parent.suffix != ".app":
+        return None
+    shared_frameworks = contents / "SharedFrameworks"
+    return shared_frameworks.resolve() if shared_frameworks.is_dir() else None
+
+
 def _quote_path(path: Path) -> str:
     return json.dumps(str(path), ensure_ascii=False)
 
@@ -130,6 +138,8 @@ def build_overalls_profile(
     }
     if developer_path := _active_developer_path():
         read_paths.add(developer_path)
+        if shared_frameworks := _xcode_shared_frameworks_path(developer_path):
+            read_paths.add(shared_frameworks)
     write_paths = {workspace, temporary_path, *config.write_paths}
     git_write_paths: tuple[Path, ...] = ()
     git_paths = git_paths or OverallsGitPaths.discover(
