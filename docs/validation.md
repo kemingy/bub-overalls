@@ -3,7 +3,14 @@
 Checked on 2026-10-18 with Python 3.13.14 on macOS ARM64 (Darwin 25.6.0).
 Bub 0.5.1 is installed from the package index, satisfying `bub>=0.5.1`.
 The checks below pass against that released version.
-Linux is unsupported; Intel Macs and other macOS/Python versions are not tested here.
+Linux is unsupported. The local results below cover only that ARM64/Python version.
+
+GitHub Actions runs `make check` and `make package` on macOS ARM64, plus
+`make test` and `make test-sandbox` on both macOS 15 Intel (`macos-15-intel`)
+and ARM64 (`macos-15`) with Python 3.12, 3.13, and 3.14. Each test job verifies
+the Python process architecture before testing. CI runs on pushes to `main`,
+pull requests targeting `main`, and manual dispatch; see the
+[workflow](../.github/workflows/check.yml) for results from those runners.
 
 ## Verification
 

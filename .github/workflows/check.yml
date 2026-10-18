@@ -1,0 +1,60 @@
+name: Python Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        ignore-nothing-to-cache: true
+        python-version: "3.12"
+    - name: Check
+      run: make check
+    - name: Build package
+      run: make package
+
+  test:
+    name: Test Python ${{ matrix.python-version }} (${{ matrix.platform.arch }})
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+        platform:
+        - runner: macos-15-intel
+          arch: x86_64
+        - runner: macos-15
+          arch: arm64
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        ignore-nothing-to-cache: true
+        python-version: ${{ matrix.python-version }}
+    - name: Check architecture
+      env:
+        EXPECTED_ARCH: ${{ matrix.platform.arch }}
+      run: uv run -- python -c 'import os, platform; assert platform.machine() == os.environ["EXPECTED_ARCH"], platform.machine()'
+    - name: Test
+      run: make test
+    - name: Test Seatbelt
+      run: make test-sandbox
