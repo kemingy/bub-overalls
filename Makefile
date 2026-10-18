@@ -1,6 +1,6 @@
 .DEFAULT_GOAL:=install
 
-SOURCE_FILES=src tests scripts
+SOURCE_FILES=src tests
 
 install:
 	uv sync --all-groups
@@ -10,9 +10,6 @@ test:
 
 test-sandbox:
 	BUB_OVERALLS_TEST=1 uv run -- pytest tests -vv -rs -m sandbox
-
-benchmark:
-	uv run -- python scripts/benchmark.py
 
 clean:
 	@rm -rf build/ dist/ .pdm-build/
@@ -32,4 +29,4 @@ lint:
 check: lint
 	@uv lock --locked
 
-.PHONY: install test test-sandbox benchmark clean package format lint check
+.PHONY: install test test-sandbox clean package format lint check

@@ -15,7 +15,7 @@ The current upstream Bub uses Loguru and does not collect stdlib records into it
 sinks. Hosted Overalls diagnostics remain silent unless the application installs
 a standard handler or a bridge. A Bub-owned bridge can be proposed separately;
 Overalls does not install one. Other hosts can use standard handlers directly.
-Command stdout and stderr are forwarded unchanged, and benchmark stdout stays JSON.
+Command stdout and stderr are forwarded unchanged.
 CLI output uses nonblocking writes: a stalled consumer does not prevent timeout
 or signal cleanup. Cancellation may discard pending output. The CLI's default
 logging handler drops diagnostics when stderr cannot accept them, so it cannot
@@ -330,7 +330,6 @@ make format
 make check
 make test
 make test-sandbox
-make benchmark
 make package
 ```
 
@@ -349,7 +348,7 @@ upstream Bub annotations. The Makefile follows SpecTree: `make` installs depende
 `make lint` checks source files, and `make package` cleans build artifacts first.
 Real sandbox tests require macOS and permission to launch Seatbelt
 outside any enclosing restrictive sandbox. See [validation](validation.md)
-for test coverage and execution measurements.
+for test coverage.
 
 The Python API exports `OverallsConfig` and `OverallsEnvironment` from
 `bub_overalls`. Seatbelt profile generation uses `build_overalls_profile`.

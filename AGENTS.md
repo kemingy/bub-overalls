@@ -16,15 +16,15 @@
   Do not add YAML or Pydantic settings adapters; prefer msgspec if structured
   validation becomes necessary.
 - Use verbs for action helpers, `config` for configuration, `returncode`/`stdout`/
-  `stderr` for process results, and unit suffixes for benchmark timings. Mark
-  implementation helpers private and use `Self` for subclass-preserving factories.
+  `stderr` for process results. Mark implementation helpers private and use `Self`
+  for subclass-preserving factories.
 - Keep strict mypy and Ruff naming/modernization checks enabled. Use typed
   attributes directly instead of dynamic attribute lookup in runtime code.
 - Python's minimum version must match the required Bub API, currently 3.12.
 - Follow `../spectree` Makefile style: install by default, direct `uv` commands,
   quiet format/lint recipes, and clean before packaging. Use Makefile targets
   for format, lint/check, tests, and packaging.
-- Update docs and tests when behavior changes. Keep unit, real sandbox, and
-  benchmark evidence distinct.
+- Update docs and tests when behavior changes. Keep unit and real sandbox
+  test evidence distinct.
 - Do not claim VM isolation, cgroup limits, or reliable detached-process cleanup.
 - Use Conventional Commits and explain non-obvious isolation/lifecycle choices.

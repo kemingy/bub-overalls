@@ -52,4 +52,4 @@ Workspace writes persist, and workspace `.env` files remain readable. Only tools
 using Bub's `Environment` are sandboxed. Plugin logs use standard Python logging;
 the standalone CLI logs at INFO on stderr (see the configuration guide).
 
-[Configuration and limits](docs/sandbox.md) · [Tests and benchmarks](docs/validation.md)
+[Configuration and limits](docs/sandbox.md) · [Validation](docs/validation.md)

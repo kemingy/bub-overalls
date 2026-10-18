@@ -29,7 +29,7 @@ write_template = "__version__ = \"{}\"\n"
 [tool.pdm.build]
 package-dir = "src"
 includes = ["src/bub_overalls"]
-source-includes = ["README.md", "LICENSE", "tests", "scripts", "docs", "Makefile"]
+source-includes = ["README.md", "LICENSE", "tests", "docs", "Makefile"]
 
 [dependency-groups]
 dev = ["mypy>=1.20", "pytest>=9", "pytest-asyncio>=1", "ruff>=0.15"]

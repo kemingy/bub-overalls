@@ -14,9 +14,9 @@ pull requests targeting `main`, and manual dispatch; see the
 
 ## Verification
 
-- `make check`: lock validation, Ruff format/lint, and mypy across package, tests,
-  and scripts pass. Formatting follows `../spectree`, with Ruff naming and
-  modernization rules added. Mypy uses strict mode and follows upstream Bub
+- `make check`: lock validation, Ruff format/lint, and mypy across package and
+  tests pass. Formatting follows `../spectree`, with Ruff naming and modernization
+  rules added. Mypy uses strict mode and follows upstream Bub
   annotations rather than treating its environment API as `Any`.
 - `make test`: 158 unit tests pass.
 - `make test-sandbox`: 79 real Seatbelt tests pass.
@@ -92,29 +92,4 @@ A separate live smoke check through `bub-overalls exec --network enabled` resolv
 `example.com` and completed a verified HTTPS request with `/usr/bin/curl` (HTTP
 200). The automated suite uses local listeners and requires no external service.
 
-## Execution comparison
-
-Raw data: [benchmark-seatbelt-macos-arm64.json](benchmark-seatbelt-macos-arm64.json).
-These timings were collected before switching Bub's dependency source.
-Reproduce with `make benchmark`, or save the output using:
-
-```sh
-uv run python scripts/benchmark.py --output docs/benchmark-seatbelt-macos-arm64.json
-```
-
-| Measurement | Direct native | Seatbelt |
-| --- | ---: | ---: |
-| `true` median, 30 samples | 4.392 ms | 16.499 ms |
-| `true` p95 | 6.701 ms | 21.213 ms |
-| Integer loop median, 5 samples | 67.229 ms | 65.773 ms |
-
-Creation including actual preflight took 21.368 ms. Paired runs alternate
-order after warmup and use the same Python binary. Command timing includes startup
-and pipes; computation is timed inside the process. No sandbox tests ran alongside
-this benchmark. Small samples and host scheduling limit conclusions; this is not
-a general throughput guarantee. CPU/RAM tuning, large builds, file-heavy workloads,
-concurrency, and grant-size sensitivity are not evaluated.
-
-This isolates execution from the model, planning, and retrieval by replaying fixed
-workloads. It does not evaluate those agent components or end-to-end task quality.
 Permission and lifecycle limits are described in the [sandbox guide](sandbox.md).
