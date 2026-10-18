@@ -1,6 +1,7 @@
 """Generate an SBPL profile; never interpolate paths as executable profile syntax."""
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -18,6 +19,33 @@ OVERALLS_PROTECTED_NAMES = (
     ".aws",
     ".ssh",
 )
+
+
+def _active_developer_path() -> Path | None:
+    if sys.platform != "darwin":
+        return None
+    try:
+        result = subprocess.run(
+            ["/usr/bin/xcode-select", "-p"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode:
+        return None
+    path = Path(result.stdout.strip())
+    if not path.is_absolute():
+        return None
+    if path.suffix == ".app":
+        path = path / "Contents" / "Developer"
+    try:
+        path = path.resolve(strict=True)
+    except OSError:
+        return None
+    return path if path.is_dir() else None
 
 
 def _quote_path(path: Path) -> str:
@@ -90,7 +118,6 @@ def build_overalls_profile(
         Path("/bin"),
         Path("/sbin"),
         Path("/Library"),
-        Path("/Applications"),
         Path("/private/etc"),
         Path("/private/var/db/dyld"),
         Path(sys.base_prefix).resolve(),
@@ -101,6 +128,8 @@ def build_overalls_profile(
         *config.read_paths,
         *config.write_paths,
     }
+    if developer_path := _active_developer_path():
+        read_paths.add(developer_path)
     write_paths = {workspace, temporary_path, *config.write_paths}
     git_write_paths: tuple[Path, ...] = ()
     git_paths = git_paths or OverallsGitPaths.discover(

@@ -230,7 +230,7 @@ class OverallsProcessManager:
                 self._errors.append(error)
         if not stopped:
             self._errors.extend(processes.signal(kill=True))
-        self._errors.extend(await processes.wait())
+        self._errors.extend(await processes.wait(drain=True))
         self._processes.clear()
         if self._errors:
             raise ExceptionGroup("Failed to stop sandbox process groups", self._errors)

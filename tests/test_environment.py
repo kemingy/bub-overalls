@@ -68,6 +68,19 @@ async def test_file_helpers_use_sandbox_spawn(
         await environment.close()
 
 
+async def test_process_env_preserves_developer_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DEVELOPER_DIR", "/custom/developer")
+    environment = OverallsEnvironment(OverallsConfig(), tmp_path)
+    try:
+        assert (
+            environment._build_process_env(None)["DEVELOPER_DIR"] == "/custom/developer"
+        )
+    finally:
+        await environment.close()
+
+
 async def test_close_is_idempotent_and_blocks_new_commands(tmp_path: Path) -> None:
     environment = OverallsEnvironment(OverallsConfig(), tmp_path)
     temporary_path = environment.temporary_path
@@ -212,13 +225,13 @@ async def test_repeated_close_cancellation_waits_for_cleanup(tmp_path: Path) -> 
     environment = OverallsEnvironment(OverallsConfig(), tmp_path)
     stopping, release = asyncio.Event(), asyncio.Event()
 
-    async def wait() -> int:
+    async def communicate() -> tuple[bytes, bytes]:
         stopping.set()
         await release.wait()
-        return -9
+        return b"", b""
 
     process = Mock()
-    process.wait = AsyncMock(side_effect=wait)
+    process.process.communicate = AsyncMock(side_effect=communicate)
     environment._process_manager._processes.add(process)
     closing = asyncio.create_task(environment.close())
     await stopping.wait()
@@ -315,7 +328,7 @@ async def test_cleanup_wait_is_bounded(
     environment = OverallsEnvironment(OverallsConfig(), tmp_path)
     monkeypatch.setattr("bub_overalls.process._STOP_TIMEOUT_SECONDS", 0.01)
     process = Mock()
-    process.wait = AsyncMock(side_effect=asyncio.Event().wait)
+    process.process.communicate = AsyncMock(side_effect=asyncio.Event().wait)
     environment._process_manager._processes.add(process)
     async with asyncio.timeout(1):
         await environment.close()
@@ -341,11 +354,11 @@ async def test_normal_close_allows_process_group_to_exit(tmp_path: Path) -> None
     environment = OverallsEnvironment(OverallsConfig(), tmp_path)
     process = Mock()
     process.is_running.side_effect = [True, False]
-    process.wait = AsyncMock(return_value=0)
+    process.process.communicate = AsyncMock(return_value=(b"", b""))
     environment._process_manager._processes.add(process)
     await environment.close()
     process.signal.assert_called_once_with(kill=False)
-    process.wait.assert_awaited_once()
+    process.process.communicate.assert_awaited_once()
     assert not environment.temporary_path.exists()
 
 
@@ -356,12 +369,12 @@ async def test_normal_close_escalates_unresponsive_groups_together(
     processes = [Mock(), Mock()]
     for process in processes:
         process.is_running.return_value = True
-        process.wait = AsyncMock(return_value=-9)
+        process.process.communicate = AsyncMock(return_value=(b"", b""))
         environment._process_manager._processes.add(process)
     await environment.close()
     for process in processes:
         assert process.signal.call_args_list == [call(kill=False), call(kill=True)]
-        process.wait.assert_awaited_once()
+        process.process.communicate.assert_awaited_once()
 
 
 async def test_cancelling_graceful_close_forces_immediate_termination(
@@ -377,7 +390,7 @@ async def test_cancelling_graceful_close_forces_immediate_termination(
         return True
 
     process.is_running.side_effect = is_running
-    process.wait = AsyncMock(return_value=-9)
+    process.process.communicate = AsyncMock(return_value=(b"", b""))
     environment._process_manager._processes.add(process)
     closing = asyncio.create_task(environment.close())
     await checking.wait()
@@ -395,7 +408,7 @@ async def test_signal_failure_does_not_skip_other_groups_or_files(
     environment = OverallsEnvironment(OverallsConfig(), tmp_path)
     denied, other = Mock(), Mock()
     for process in (denied, other):
-        process.wait = AsyncMock(return_value=-9)
+        process.process.communicate = AsyncMock(return_value=(b"", b""))
         environment._process_manager._processes.add(process)
     denied.pid = 12345
     denied.signal.side_effect = PermissionError("signal denied")
@@ -404,7 +417,7 @@ async def test_signal_failure_does_not_skip_other_groups_or_files(
     ) as error:
         await environment.close()
     other.signal.assert_called_with(kill=True)
-    other.wait.assert_awaited_once()
+    other.process.communicate.assert_awaited_once()
     assert all(isinstance(item, PermissionError) for item in error.value.exceptions)
     assert not environment.temporary_path.exists()
 
@@ -416,7 +429,7 @@ async def test_cancelling_close_kills_registered_groups_during_startup(
     started, release = asyncio.Event(), asyncio.Event()
     killed = asyncio.Event()
     existing = Mock()
-    existing.wait = AsyncMock(return_value=-9)
+    existing.process.communicate = AsyncMock(return_value=(b"", b""))
     environment._process_manager._processes.add(existing)
 
     def signal_existing(*, kill: bool) -> None:
@@ -464,15 +477,15 @@ async def test_wait_failure_does_not_skip_waiting_for_other_groups(
     for process in (failed, other):
         process.is_running.return_value = False
         environment._process_manager._processes.add(process)
-    failed.wait = AsyncMock(side_effect=OSError("wait failed"))
+    failed.process.communicate = AsyncMock(side_effect=OSError("wait failed"))
     finished = asyncio.Event()
 
-    async def wait_for_other() -> int:
+    async def communicate_with_other() -> tuple[bytes, bytes]:
         await asyncio.sleep(0)
         finished.set()
-        return 0
+        return b"", b""
 
-    other.wait = AsyncMock(side_effect=wait_for_other)
+    other.process.communicate = AsyncMock(side_effect=communicate_with_other)
     with pytest.raises(ExceptionGroup, match="Failed to stop sandbox process groups"):
         await environment.close()
     assert finished.is_set()

@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -41,11 +42,27 @@ def test_profile_escapes_read_paths_and_keeps_network_denied(tmp_path: Path) -> 
     assert "(allow signal (target same-sandbox))" in profile
 
 
-def test_profile_reads_installed_applications(tmp_path: Path) -> None:
+def test_profile_reads_only_active_developer_tools(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = tmp_path / "Relocated Xcode.app"
+    developer = app / "Contents" / "Developer"
+    developer.mkdir(parents=True)
+
+    def select(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=f"{app}\n", stderr=""
+        )
+
+    monkeypatch.setattr("bub_overalls.profile.subprocess.run", select)
+    monkeypatch.setattr("bub_overalls.profile.sys.platform", "darwin")
     profile = build_overalls_profile(
         OverallsConfig(), tmp_path / "workspace", tmp_path / "temporary"
     )
-    assert '(allow file-read* (subpath "/Applications"))' in profile
+    expected = f"(allow file-read* (subpath {json.dumps(str(developer.resolve()))}))"
+    assert expected in profile
+    assert '(allow file-read* (subpath "/Applications"))' not in profile
+    assert "Xcode[^/]" not in profile
 
 
 @pytest.mark.parametrize("character", ['"', "\\", "\n", "\r", "\t", "\x1b"])

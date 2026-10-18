@@ -122,7 +122,7 @@ class OverallsEnvironment(LocalEnvironment):
     def _build_process_env(self, overrides: Mapping[str, str] | None) -> dict[str, str]:
         process_env = {
             key: os.environ[key]
-            for key in ("USER", "LOGNAME", "LANG", "LC_ALL", "TERM")
+            for key in ("USER", "LOGNAME", "LANG", "LC_ALL", "TERM", "DEVELOPER_DIR")
             if key in os.environ
         }
         process_env.update(
