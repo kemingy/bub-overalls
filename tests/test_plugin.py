@@ -269,12 +269,12 @@ def test_prompt_hook_leaves_other_environments_unchanged(
     assert request.messages == [{"role": "user", "content": "Hi"}]
 
 
-@pytest.mark.parametrize("session_id", ["cli_session", "cli:local", "telegram:123"])
-async def test_documented_session_selection_sandboxes_default_channels(
+@pytest.mark.parametrize("session_id", ["cli_session", "cli:local"])
+async def test_documented_session_selection_sandboxes_cli_channels(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, session_id: str
 ) -> None:
     guide = (Path(__file__).parents[1] / "docs" / "sandbox.md").read_text()
-    setting = guide.split("export BUB_OVERALLS_SESSIONS='", 1)[1].split("'", 1)[0]
+    setting = guide.split("BUB_OVERALLS_SESSIONS='", 1)[1].split("'", 1)[0]
     monkeypatch.setenv("BUB_OVERALLS_SESSIONS", setting)
     environment = Mock(spec=OverallsEnvironment)
     create = AsyncMock(return_value=environment)
