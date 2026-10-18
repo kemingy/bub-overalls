@@ -41,6 +41,13 @@ def test_profile_escapes_read_paths_and_keeps_network_denied(tmp_path: Path) -> 
     assert "(allow signal (target same-sandbox))" in profile
 
 
+def test_profile_reads_installed_applications(tmp_path: Path) -> None:
+    profile = build_overalls_profile(
+        OverallsConfig(), tmp_path / "workspace", tmp_path / "temporary"
+    )
+    assert '(allow file-read* (subpath "/Applications"))' in profile
+
+
 @pytest.mark.parametrize("character", ['"', "\\", "\n", "\r", "\t", "\x1b"])
 @pytest.mark.parametrize("root_kind", ["workspace", "write_grant", "temporary"])
 def test_profile_rejects_unsupported_write_root_characters(

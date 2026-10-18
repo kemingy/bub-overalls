@@ -90,6 +90,7 @@ def build_overalls_profile(
         Path("/bin"),
         Path("/sbin"),
         Path("/Library"),
+        Path("/Applications"),
         Path("/private/etc"),
         Path("/private/var/db/dyld"),
         Path(sys.base_prefix).resolve(),

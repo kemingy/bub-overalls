@@ -103,6 +103,12 @@ async def test_code_callbacks_and_cancellation(
     environment: OverallsEnvironment,
 ) -> None:
     output: list[str] = []
+    started = asyncio.Event()
+
+    def write(content: str) -> None:
+        output.append(content)
+        if "started" in "".join(output):
+            started.set()
 
     async def callback(name: str, arguments: dict[str, Any]) -> Any:
         assert name == "echo"
@@ -112,17 +118,22 @@ async def test_code_callbacks_and_cancellation(
         "print(await tools.echo(text='works'))",
         tools=["echo"],
         call_tool=callback,
-        write=output.append,
+        write=write,
     )
     assert "works" in "".join(output)
+    task = asyncio.create_task(
+        environment.run_code(
+            "import asyncio; print('started'); await asyncio.sleep(60)",
+            tools=[],
+            call_tool=callback,
+            write=write,
+        )
+    )
+    async with asyncio.timeout(5):
+        await started.wait()
     with pytest.raises(TimeoutError):
         async with asyncio.timeout(0.3):
-            await environment.run_code(
-                "import asyncio; print('started'); await asyncio.sleep(60)",
-                tools=[],
-                call_tool=callback,
-                write=output.append,
-            )
+            await task
     assert "started" in "".join(output)
 
 
