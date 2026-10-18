@@ -48,8 +48,10 @@ def test_profile_reads_only_active_xcode_paths(
     app = tmp_path / "Relocated Xcode.app"
     developer = app / "Contents" / "Developer"
     shared_frameworks = app / "Contents" / "SharedFrameworks"
+    frameworks = app / "Contents" / "Frameworks"
     developer.mkdir(parents=True)
     shared_frameworks.mkdir()
+    frameworks.mkdir()
 
     def select(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(
@@ -61,7 +63,7 @@ def test_profile_reads_only_active_xcode_paths(
     profile = build_overalls_profile(
         OverallsConfig(), tmp_path / "workspace", tmp_path / "temporary"
     )
-    for path in (developer, shared_frameworks):
+    for path in (developer, shared_frameworks, frameworks):
         expected = f"(allow file-read* (subpath {json.dumps(str(path.resolve()))}))"
         assert expected in profile
     assert '(allow file-read* (subpath "/Applications"))' not in profile

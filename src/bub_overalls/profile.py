@@ -48,12 +48,15 @@ def _active_developer_path() -> Path | None:
     return path if path.is_dir() else None
 
 
-def _xcode_shared_frameworks_path(developer_path: Path) -> Path | None:
+def _xcode_runtime_paths(developer_path: Path) -> tuple[Path, ...]:
     contents = developer_path.parent
     if contents.name != "Contents" or contents.parent.suffix != ".app":
-        return None
-    shared_frameworks = contents / "SharedFrameworks"
-    return shared_frameworks.resolve() if shared_frameworks.is_dir() else None
+        return ()
+    return tuple(
+        path.resolve()
+        for path in (contents / "SharedFrameworks", contents / "Frameworks")
+        if path.is_dir()
+    )
 
 
 def _quote_path(path: Path) -> str:
@@ -138,8 +141,7 @@ def build_overalls_profile(
     }
     if developer_path := _active_developer_path():
         read_paths.add(developer_path)
-        if shared_frameworks := _xcode_shared_frameworks_path(developer_path):
-            read_paths.add(shared_frameworks)
+        read_paths.update(_xcode_runtime_paths(developer_path))
     write_paths = {workspace, temporary_path, *config.write_paths}
     git_write_paths: tuple[Path, ...] = ()
     git_paths = git_paths or OverallsGitPaths.discover(
