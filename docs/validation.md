@@ -1,95 +1,40 @@
 # Validation
 
-Checked on 2026-10-18 with Python 3.13.14 on macOS ARM64 (Darwin 25.6.0).
-Bub 0.5.1 is installed from the package index, satisfying `bub>=0.5.1`.
-The checks below pass against that released version.
-Linux is unsupported. The local results below cover only that ARM64/Python version.
+Local results recorded on 2026-10-18: macOS ARM64 (Darwin 25.6.0), Python 3.13.14,
+and released Bub 0.5.1. These results do not establish support for other hosts.
 
-GitHub Actions runs `make check` and `make package` on macOS ARM64, plus
-`make test` and `make test-sandbox` on both macOS 15 Intel (`macos-15-intel`)
-and ARM64 (`macos-15`) with Python 3.12, 3.13, and 3.14. Each test job verifies
-the Python process architecture before testing. CI runs on pushes to `main`,
-pull requests targeting `main`, and manual dispatch; see the
-[workflow](../.github/workflows/check.yml) for results from those runners.
+| Command | Result |
+| --- | --- |
+| `make check` | Lockfile, Ruff format/lint, and strict mypy pass |
+| `make test` | 158 unit tests pass |
+| `make test-sandbox` | 79 real Seatbelt tests pass |
+| `make package` | Wheel and source distribution build |
 
-## Verification
+Package inspection also verified CLI/plugin entry points, the typed marker,
+Bub discovery, and imports outside the editable checkout.
 
-- `make check`: lock validation, Ruff format/lint, and mypy across package and
-  tests pass. Formatting follows `../spectree`, with Ruff naming and modernization
-  rules added. Mypy uses strict mode and follows upstream Bub
-  annotations rather than treating its environment API as `Any`.
-- `make test`: 158 unit tests pass.
-- `make test-sandbox`: 79 real Seatbelt tests pass.
-- `make package`: wheel and source distribution build under `bub-overalls`.
-- Wheel inspection verifies the package, typed marker, CLI/plugin entry points,
-  Python minimum, and Bub as the only direct runtime dependency. The extracted
-  wheel imports successfully outside the editable package.
-- Bub discovers `provide_environment: builtin, overalls`. Environment-variable
-  configuration is exercised through the plugin against real Seatbelt.
+## Coverage
 
-Real sandbox tests cover native commands, streams, live file writes, denied
-reads/writes outside grants, symlinks, protected metadata, explicit path grants,
-TCP/Unix-socket denial against working listeners, IPv4/IPv6 TCP and UDP opt-in,
-inbound listener denial in both modes, retained filesystem and Unix-socket
-restrictions with networking enabled, code callbacks, cancellation,
-process-group cleanup, credential filtering, Unicode paths, CLI cleanup, and
-async context cleanup on success, exceptions, and cancellation. Context tests
-cover direct construction and environments returned by `create()`. Signal tests
-verify group-wide SIGTERM/SIGKILL, cleanup after the leader exits, cancellation of
-raw waiters, and standalone CLI SIGINT/SIGTERM/timeout exits with descendants stopped,
-including full stdout/stderr pipes whose consumers do not read. Git tests exercise
-staging, commits, revert, reset, and status in regular repositories and linked
-worktrees, an initial commit with a separate Git directory, repository-local author identity
-without home-config access, read-only defaults, protected config/hooks/layout pointers, and
-unchanged original/sibling worktree metadata even with overlapping write grants.
-Additional regressions verify that submodule config, hooks, and other metadata
-remain read-only in ordinary and linked worktrees with Git access on or off;
-nested Git and agent/IDE paths stay read-only in workspace, extra write roots,
-and session temporary directories. Recursive tests cover mixed case, gitfiles,
-creation, deletion, renaming, symlink aliases, overlapping direct grants,
-regex metacharacters and Unicode in roots, and writable lookalike names such as
-`.github`. Workspaces under `.claude/worktrees`, `.codex/worktrees`, and `.git`,
-plus grants under `.cursor`, remain writable while their nested metadata stays
-protected. Linked-worktree commits under both agent directories and root case
-aliases on a case-insensitive filesystem are exercised.
-Malformed Git layouts permit workspace edits only in read-only Git mode. These
-tests use inert writes and do not execute host-side hook or fsmonitor payloads.
-Staged shutdown tests verify a real termination handler completes, ignored SIGTERM
-escalates with both zero and 0.05-second grace periods, and a descendant ignoring
-SIGTERM is killed even after its leader exits. Normal operation uses a shared
-1-second grace period; cancellation bypasses it.
-Unit tests cover argument parsing, exit codes, errors, configuration, initialization
-failure, standard host logging and standalone CLI log levels, file-operation
-routing, nonblocking output cancellation, descriptor flag restoration for merged
-streams, byte-preserving partial writes, environment-variable grants, explicit
-session selection including the documented default channel IDs, rejected
-malformed session arrays and blank entries, startup diagnostics, plugin preflight failures,
-model guidance through Bub's hook dispatcher, active grants despite changed launch variables,
-unchanged request history, duplicate guidance prevention, other environment providers,
-Git opt-in parsing, directory/gitfile/worktree metadata discovery, rejected
-malformed metadata and worktree backlinks,
-unsupported write-root characters (quotes, backslashes, and control characters),
-immediate removal of real temporary directories after workspace, write-grant,
-or temporary-root rejection while their owners remain referenced,
-network configuration validation,
-CLI network overrides, common boolean
-spellings, malformed and empty path entries, relative
-and home-relative grants, symlink normalization, deleted grants, failed context
-entry cleanup, rejection of context entry after close, repeated cancellation during
-startup/file/code/close cleanup, expected startup failures preserving cancellation,
-unexpected startup errors remaining visible, startup racing close, idempotent hard termination, bounded cleanup waits, graceful
-shutdown and escalation, forced shutdown during startup, and continued cleanup
-after signal or wait failures. No
-model/provider credentials are needed.
+- Configuration and integration: path/boolean validation, session selection,
+  active-grant prompt guidance, initialization failures, and host-owned logging.
+- Filesystem and Git: actual allowed/denied operations, symlinks, nested protected
+  names, agent-managed worktrees, unusual root characters, Git opt-in, shared
+  worktree storage, and protected hooks/config/submodule metadata.
+- Network: local listeners verify default denial and outbound IPv4/IPv6 TCP/UDP
+  opt-in; inbound listeners and unrelated Unix sockets remain denied.
+- Lifecycle: process-group cleanup, TERM-to-KILL escalation, repeated cancellation,
+  startup/shutdown races, blocked pipes, CLI signals/timeouts, and temp cleanup.
 
-The process-manager refactor preserves the same lifecycle suite. The environment
-now delegates process ownership to `process.py`; tests still exercise repeated
-cancellation, late startup, forced shutdown during startup, group escalation,
-and cleanup after signal or wait failures. Session files remain until owned
-startup and process cleanup finish.
+Tests need no model credentials or external services. Real sandbox tests require
+macOS and permission to launch Seatbelt outside any enclosing restrictive sandbox.
+Security regressions use inert writes rather than host-executed payloads.
+A separate manual check verified DNS and HTTPS with networking enabled.
 
-A separate live smoke check through `bub-overalls exec --network enabled` resolved
-`example.com` and completed a verified HTTPS request with `/usr/bin/curl` (HTTP
-200). The automated suite uses local listeners and requires no external service.
+## CI
 
-Permission and lifecycle limits are described in the [sandbox guide](sandbox.md).
+The [workflow](../.github/workflows/check.yml) checks and builds on macOS ARM64.
+Unit and real Seatbelt tests run on macOS 15 Intel (`macos-15-intel`) and ARM64
+(`macos-15`) with Python 3.12–3.14. Each job verifies its Python architecture.
+Triggers: pushes to `main`, PRs targeting `main`, and manual dispatch.
+Consult CI runs for hosted results; the local counts above are separate evidence.
+Linux is not implemented. See [sandbox boundaries](sandbox.md) for remaining limits.
