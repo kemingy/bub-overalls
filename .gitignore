@@ -8,3 +8,6 @@ build/
 dist/
 *.egg-info/
 .DS_Store
+src/bub_overalls/__version__.py
+.pdm-build/
+.isaac/

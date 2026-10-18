@@ -327,7 +327,8 @@ wheels = [
 
 [[package]]
 name = "bub"
-source = { editable = "../bub" }
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "any-llm-sdk" },
@@ -346,53 +347,16 @@ dependencies = [
     { name = "typer" },
     { name = "typing-extensions" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp", specifier = ">=3.14.3" },
-    { name = "any-llm-sdk", extras = ["anthropic"], specifier = ">=1.22.1" },
-    { name = "authlib", specifier = ">=1.7.2" },
-    { name = "httpx", extras = ["socks"], specifier = ">=0.28.1" },
-    { name = "inquirer-textual", specifier = ">=0.8.0" },
-    { name = "logfire", marker = "extra == 'logfire'", specifier = ">=4.32.0" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "opentelemetry-api", marker = "extra == 'logfire'", specifier = ">=1.39.0" },
-    { name = "opentelemetry-api", marker = "extra == 'trace'", specifier = ">=1.39.0" },
-    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'logfire'", specifier = ">=1.39.0" },
-    { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'trace'", specifier = ">=1.39.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'logfire'", specifier = ">=1.39.0" },
-    { name = "opentelemetry-sdk", marker = "extra == 'trace'", specifier = ">=1.39.0" },
-    { name = "pluggy", specifier = ">=1.6.0" },
-    { name = "prompt-toolkit", specifier = ">=3.0.52" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pydantic-settings", specifier = ">=2.14.2" },
-    { name = "python-telegram-bot", specifier = ">=22.7" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "rapidfuzz", specifier = ">=3.14.5" },
-    { name = "rich", specifier = ">=14.3.4" },
-    { name = "typer", specifier = ">=0.24.1" },
-    { name = "typing-extensions", specifier = ">=4.15.0" },
-]
-provides-extras = ["logfire", "trace"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=1.20.0" },
-    { name = "prek", specifier = ">=0.3.8" },
-    { name = "pytest", specifier = ">=9.0.3" },
-    { name = "pytest-asyncio", specifier = ">=1.3.0" },
-    { name = "ruff", specifier = ">=0.15.10" },
-    { name = "tox-uv", specifier = ">=1.35.1" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20260408" },
+sdist = { url = "https://files.pythonhosted.org/packages/ef/79/7b307f6745c805570b64e90bad8cf798f631ee0eac780e32c3fbb39bbe8e/bub-0.5.1.tar.gz", hash = "sha256:cbf2d18b2132651af94ae2890c417cbead6a835d4dc3d59d0a4d889bb902472e", size = 235764, upload-time = "2026-10-11T04:53:14.322Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/d1/a7c6855d6b74267bb171205d08d7ea0ce2ffbd3ed2d690ed5a70fc0b1183/bub-0.5.1-py3-none-any.whl", hash = "sha256:054b4214a31081134c0f744500fe2f7645c811904345983a42a0481b74e77fd6", size = 178146, upload-time = "2026-10-11T04:53:12.774Z" },
 ]
 
 [[package]]
-name = "bub-sandbox"
-version = "0.1.0"
+name = "bub-overalls"
 source = { editable = "." }
 dependencies = [
     { name = "bub" },
-    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -404,10 +368,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "bub", editable = "../bub" },
-    { name = "typer", specifier = ">=0.24" },
-]
+requires-dist = [{ name = "bub", specifier = ">=0.5.1" }]
 
 [package.metadata.requires-dev]
 dev = [

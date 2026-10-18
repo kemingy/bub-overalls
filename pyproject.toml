@@ -1,49 +1,67 @@
 [project]
-name = "bub-sandbox"
-version = "0.1.0"
-description = "Experimental libkrun execution environments for Bub"
+name = "bub-overalls"
+dynamic = ["version"]
+description = "A macOS Seatbelt sandbox plugin for Bub."
 readme = "README.md"
-requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["bub>=0.5.2.dev4", "typer>=0.24"]
+# Bub's Environment API requires Python 3.12 or newer.
+requires-python = ">=3.12"
+dependencies = [
+    "bub>=0.5.1",
+]
 
 [project.entry-points.bub]
-sandbox = "bub_sandbox.plugin"
+overalls = "bub_overalls.plugin"
 
 [project.scripts]
-bub-sandbox = "bub_sandbox.cli:app"
-
-[dependency-groups]
-dev = ["pytest>=9", "pytest-asyncio>=1", "ruff>=0.15", "mypy>=1.20"]
+bub-overalls = "bub_overalls.main:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/bub_sandbox"]
+[tool.pdm.version]
+source = "scm"
+fallback_version = "0.0.0"
+write_to = "bub_overalls/__version__.py"
+write_template = "__version__ = \"{}\"\n"
 
-[tool.uv.sources]
-bub = { path = "../bub", editable = true }
+[tool.pdm.build]
+package-dir = "src"
+includes = ["src/bub_overalls"]
+source-includes = ["README.md", "LICENSE", "tests", "scripts", "docs", "Makefile"]
+
+[dependency-groups]
+dev = ["mypy>=1.20", "pytest>=9", "pytest-asyncio>=1", "ruff>=0.15"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "G", "I", "SIM", "TID", "PL", "RUF", "N", "UP"]
+ignore = ["E501", "PLR2004", "RUF012", "B009"]
+
+[tool.ruff.lint.pylint]
+max-args = 12
+max-branches = 15
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.mypy]
+strict = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["bub", "bub.*"]
+# Bub has annotations but does not yet ship a py.typed marker.
+follow_untyped_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-markers = ["vm: requires a built helper and guest image"]
-
-[tool.ruff]
-target-version = "py312"
-line-length = 120
-extend-exclude = ["build"]
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
-
-[tool.mypy]
-python_version = "3.12"
-check_untyped_defs = true
-disallow_untyped_defs = true
-
-[[tool.mypy.overrides]]
-module = ["bub.*"]
-ignore_missing_imports = true
+markers = ["sandbox: requires actual macOS Seatbelt execution"]

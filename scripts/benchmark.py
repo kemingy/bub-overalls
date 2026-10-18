@@ -1,132 +1,141 @@
-"""Deterministic execution ablations; no LLM, planning, or memory retrieval variance."""
-
-from __future__ import annotations
+"""Paired native/Seatbelt samples with the same Python binary and fixed workloads."""
 
 import argparse
 import asyncio
 import json
 import math
+import os
 import platform
 import statistics
-import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
-from bub_sandbox.environment import MicroVMEnvironment
-from bub_sandbox.settings import SandboxSettings
-from bub_sandbox.smoke import collect
+from bub_overalls.config import OverallsConfig
+from bub_overalls.environment import OverallsEnvironment
 
-CPU_CODE = (
-    "import hashlib,time,json,sys,ssl; start=time.perf_counter(); "
-    "hashlib.pbkdf2_hmac('sha256',b'bub',b'sandbox',600000); "
-    "print(json.dumps(dict(seconds=time.perf_counter()-start,python=sys.version,openssl=ssl.OPENSSL_VERSION)))"
-)
-INTEGER_CODE = (
-    "import time,json\nstart=time.perf_counter()\nx=1\n"
-    "for i in range(1000000):\n x=(x*1664525+1013904223)&0xffffffff\n"
-    "print(json.dumps(dict(seconds=time.perf_counter()-start,result=x)))"
-)
+_INTEGER_WORKLOAD_SOURCE = """
+import json
+import sys
+import time
+
+started_at = time.perf_counter()
+value = 1
+for _ in range(1000000):
+    value = (value * 1664525 + 1013904223) & 0xffffffff
+sys.stdout.write(json.dumps({"seconds": time.perf_counter() - started_at, "result": value}) + "\\n")
+"""
 
 
-def summary(values: list[float]) -> dict[str, float]:
-    ordered = sorted(values)
+def summarize_timings(samples_ms: list[float]) -> dict[str, float | list[float]]:
     return {
-        "median_ms": round(statistics.median(values) * 1000, 3),
-        "p95_ms": round(ordered[min(len(ordered) - 1, math.ceil(len(ordered) * 0.95) - 1)] * 1000, 3),
+        "median": statistics.median(samples_ms),
+        "p95": sorted(samples_ms)[math.ceil(len(samples_ms) * 0.95) - 1],
+        "samples": samples_ms,
     }
 
 
-async def benchmark(samples: int) -> dict[str, Any]:
-    settings = replace(SandboxSettings.from_env(), import_workspace=False)
-    native = [json.loads(subprocess.check_output([sys.executable, "-c", CPU_CODE])) for _ in range(samples)]
-    native_integer = [json.loads(subprocess.check_output([sys.executable, "-c", INTEGER_CODE])) for _ in range(samples)]
-    results = []
-    with tempfile.TemporaryDirectory(prefix="bub-bench-") as directory:
-        for cpus, memory in [(1, 512), (2, 512), (2, 1024)]:
-            start = time.perf_counter()
-            environment = await MicroVMEnvironment.create(
-                replace(settings, cpus=cpus, memory_mib=memory), Path(directory)
-            )
-            ready = time.perf_counter() - start
-            try:
-                cpu = []
-                integer = []
-                warm = []
-                for _ in range(samples):
-                    code, stdout, stderr = await collect(environment, ["python3", "-c", CPU_CODE])
-                    if code:
-                        raise RuntimeError(stderr.decode())
-                    cpu.append(json.loads(stdout))
-                    code, stdout, stderr = await collect(environment, ["python3", "-c", INTEGER_CODE])
-                    if code:
-                        raise RuntimeError(stderr.decode())
-                    integer.append(json.loads(stdout))
-                for _ in range(samples * 4):
-                    start = time.perf_counter()
-                    await collect(environment, ["true"])
-                    warm.append(time.perf_counter() - start)
-                start = time.perf_counter()
-                await asyncio.gather(*(collect(environment, ["python3", "-c", CPU_CODE]) for _ in range(4)))
-                parallel = time.perf_counter() - start
-                results.append(
-                    {
-                        "cpus": cpus,
-                        "memory_mib": memory,
-                        "cold_ready_seconds": round(ready, 3),
-                        "guest_compute": summary([sample["seconds"] for sample in cpu]),
-                        "guest_compute_samples": cpu,
-                        "guest_integer": summary([sample["seconds"] for sample in integer]),
-                        "warm_command_roundtrip": summary(warm),
-                        "warm_command_seconds": warm,
-                        "four_parallel_compute_seconds": round(parallel, 3),
-                    }
+async def benchmark(sample_count: int) -> dict[str, object]:
+    config = OverallsConfig.from_env()
+    with tempfile.TemporaryDirectory(prefix="bub-benchmark-") as temporary_directory:
+        workspace = Path(temporary_directory).resolve()
+        started_at = time.perf_counter()
+        async with OverallsEnvironment(config, workspace) as environment:
+            startup_seconds = time.perf_counter() - started_at
+            native_command_ms: list[float] = []
+            sandbox_command_ms: list[float] = []
+            native_compute_ms: list[float] = []
+            sandbox_compute_ms: list[float] = []
+
+            async def run_native(command: list[str]) -> bytes:
+                process = await asyncio.create_subprocess_exec(
+                    *command,
+                    cwd=workspace,
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    start_new_session=True,
+                    env={"PATH": os.defpath, "PYTHONDONTWRITEBYTECODE": "1"},
                 )
-            finally:
-                await environment.close()
-        # Natural lifecycle alternative: fresh VM per command instead of a session VM.
-        fresh = []
-        for _ in range(samples):
-            start = time.perf_counter()
-            environment = await MicroVMEnvironment.create(settings, Path(directory))
-            try:
-                await collect(environment, ["true"])
-            finally:
-                await environment.close()
-            fresh.append(time.perf_counter() - start)
-    return {
-        "host": platform.platform(),
-        "machine": platform.machine(),
-        "samples": samples,
-        "native_compute": summary([sample["seconds"] for sample in native]),
-        "native_compute_samples": native,
-        "native_integer": summary([sample["seconds"] for sample in native_integer]),
-        "configurations": results,
-        "fresh_vm_per_command": summary(fresh),
-        "limitations": [
-            "Host and guest OS, Python patch level, and OpenSSL builds can differ; "
-            "compute ratios are not pure VMM overhead.",
-            "One host, small sample count, warm image cache; no performance guarantee or cross-platform claim.",
-            "Model, planning and retrieval are bypassed; results isolate execution plumbing, not agent quality.",
-            "Workspace sharing and alternate VMM comparisons remain future work.",
-        ],
-    }
+                stdout, stderr = await process.communicate()
+                if process.returncode:
+                    raise RuntimeError(stderr.decode())
+                return stdout
+
+            async def run_sandboxed(command: list[str]) -> bytes:
+                process = await environment.spawn(command)
+                process.close_stdin()
+                returncode, stdout, stderr = await asyncio.gather(
+                    process.wait(), process.stdout.read(), process.stderr.read()
+                )
+                if returncode:
+                    raise RuntimeError(stderr.decode())
+                return stdout
+
+            # Warm both paths, alternate order to reduce fixed-order bias.
+            await run_native(["/usr/bin/true"])
+            await run_sandboxed(["/usr/bin/true"])
+            for sample_index in range(sample_count):
+                runners = [
+                    (run_native, native_command_ms),
+                    (run_sandboxed, sandbox_command_ms),
+                ]
+                if sample_index % 2 == 0:
+                    runners.reverse()
+                for run_command, timings_ms in runners:
+                    started_at = time.perf_counter()
+                    await run_command(["/usr/bin/true"])
+                    timings_ms.append((time.perf_counter() - started_at) * 1000)
+            for sample_index in range(5):
+                runners = [
+                    (run_native, native_compute_ms),
+                    (run_sandboxed, sandbox_compute_ms),
+                ]
+                if sample_index % 2 == 0:
+                    runners.reverse()
+                for run_command, timings_ms in runners:
+                    compute_result: dict[str, float | int] = json.loads(
+                        await run_command(
+                            [environment.python, "-I", "-c", _INTEGER_WORKLOAD_SOURCE]
+                        )
+                    )
+                    if compute_result["result"] != 366300225:
+                        raise RuntimeError(
+                            f"unexpected arithmetic result: {compute_result}"
+                        )
+                    timings_ms.append(compute_result["seconds"] * 1000)
+            return {
+                "host": {
+                    "system": platform.system(),
+                    "release": platform.release(),
+                    "machine": platform.machine(),
+                },
+                "python": environment.python,
+                "ready_seconds": startup_seconds,
+                "command_ms": {
+                    "native": summarize_timings(native_command_ms),
+                    "seatbelt": summarize_timings(sandbox_command_ms),
+                },
+                "integer_ms": {
+                    "native": summarize_timings(native_compute_ms),
+                    "seatbelt": summarize_timings(sandbox_compute_ms),
+                },
+                "method": "alternating paired runs; same interpreter; compute excludes startup; no LLM/planning/retrieval",
+            }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--samples", type=int, default=5)
-    parser.add_argument("--output", type=Path, default=Path("build/benchmark.json"))
-    args = parser.parse_args()
-    if args.samples < 2:
-        parser.error("use at least two samples")
-    result = asyncio.run(benchmark(args.samples))
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps(result, indent=2))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--samples", type=int, default=30)
+    parser.add_argument("--output", type=Path)
+    arguments = parser.parse_args()
+    if arguments.samples < 2:
+        parser.error("--samples must be at least 2")
+    report_json = json.dumps(asyncio.run(benchmark(arguments.samples)), indent=2)
+    if arguments.output:
+        arguments.output.write_text(report_json + "\n")
+    sys.stdout.write(report_json + "\n")
 
 
 if __name__ == "__main__":
