@@ -105,14 +105,17 @@ explains each enforcement component's role and the alternative designs.
 
 ## CI
 
-The [workflow](../.github/workflows/check.yml) checks and builds on macOS ARM64.
-Unit and real Seatbelt tests run on macOS 15 Intel (`macos-15-intel`) and ARM64
-(`macos-15`) with Python 3.12–3.14. Each job verifies its Python architecture.
+The [workflow](../.github/workflows/check.yml) runs shared lint, type checks,
+lockfile validation, and package builds once on Ubuntu 24.04 with Python 3.12.
+Unit and real sandbox tests run across Python 3.12–3.14 on all four runners:
+macOS 15 Intel (`macos-15-intel`) and ARM64 (`macos-15`), and Ubuntu 24.04
+x86_64 (`ubuntu-24.04`) and aarch64 (`ubuntu-24.04-arm`). These twelve jobs
+verify their Python architecture and run Seatbelt or Landlock tests according
+to the platform markers.
 Triggers: pushes to `main`, PRs targeting `main`, and manual dispatch.
 Consult CI runs for hosted results; the local counts above are separate evidence.
-The experimental Linux jobs target Ubuntu 24.04 x86_64/aarch64 with Python 3.12
-and run portable and real Landlock/seccomp/private-mount tests. Their host kernels
-must expose ABI 6+ and permit the required unprivileged namespaces: Linux tests fail
-if required features are unavailable. These workflow
-changes have not been run here. See [sandbox boundaries](sandbox.md) and the
+The experimental Linux jobs run real Landlock/seccomp/private-mount tests.
+Their host kernels must expose ABI 6+ and permit the required unprivileged
+namespaces: Linux tests fail if required features are unavailable. These workflow
+changes have not run on GitHub-hosted runners here. See [sandbox boundaries](sandbox.md) and the
 [Linux comparison](landlock.md) for remaining limits.

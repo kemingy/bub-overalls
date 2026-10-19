@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   lint:
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,7 +30,7 @@ jobs:
       run: make package
 
   test:
-    name: Test Python ${{ matrix.python-version }} (${{ matrix.platform.arch }})
+    name: Test Python ${{ matrix.python-version }} (${{ matrix.platform.runner }}, ${{ matrix.platform.arch }})
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 15
     strategy:
@@ -42,31 +42,6 @@ jobs:
           arch: x86_64
         - runner: macos-15
           arch: arm64
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-    - name: Install uv
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      with:
-        enable-cache: true
-        ignore-nothing-to-cache: true
-        python-version: ${{ matrix.python-version }}
-    - name: Check architecture
-      env:
-        EXPECTED_ARCH: ${{ matrix.platform.arch }}
-      run: uv run -- python -c 'import os, platform; assert platform.machine() == os.environ["EXPECTED_ARCH"], platform.machine()'
-    - name: Test
-      run: make test
-    - name: Test Seatbelt
-      run: make test-sandbox
-
-  linux:
-    name: Experimental Linux (${{ matrix.platform.arch }})
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
         - runner: ubuntu-24.04
           arch: x86_64
         - runner: ubuntu-24.04-arm
@@ -78,14 +53,14 @@ jobs:
       with:
         enable-cache: true
         ignore-nothing-to-cache: true
-        python-version: "3.12"
+        python-version: ${{ matrix.python-version }}
     - name: Check architecture and kernel
       env:
         EXPECTED_ARCH: ${{ matrix.platform.arch }}
       run: |
         uname -a
         uv run -- python -c 'import os, platform; assert platform.machine() == os.environ["EXPECTED_ARCH"], platform.machine()'
-    - name: Test portable policy construction
+    - name: Test
       run: make test
-    - name: Test Landlock, seccomp and private mounts (ABI 6+ and user/mount/IPC/network namespaces required)
+    - name: Test platform sandbox
       run: make test-sandbox
