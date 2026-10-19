@@ -1,7 +1,8 @@
-"""Run Bub processes and file operations under a shared Seatbelt policy."""
+"""Run Bub processes and file operations under a shared platform sandbox policy."""
 
 import asyncio
 import contextlib
+import json
 import os
 import platform
 import tempfile
@@ -15,6 +16,10 @@ from bub.environment import CallTool
 
 from bub_overalls.config import OverallsConfig
 from bub_overalls.git import OverallsGitPaths
+from bub_overalls.landlock import (
+    _LAUNCHER_SOURCE,
+    build_overalls_landlock_policy,
+)
 from bub_overalls.process import OverallsProcessManager, _await_cleanup
 from bub_overalls.profile import build_overalls_profile
 
@@ -32,16 +37,19 @@ else:
 
 
 class OverallsEnvironment(LocalEnvironment):
-    """Run local tools and file helpers under one Seatbelt policy."""
+    """Run local tools and file helpers under one platform sandbox policy."""
 
     def __init__(self, config: OverallsConfig, workspace: Path) -> None:
         config.validate()
-        if platform.system() != "Darwin":
-            raise RuntimeError(
-                "bub-overalls currently supports macOS only; Linux is not implemented"
-            )
-        if not Path("/usr/bin/sandbox-exec").is_file():
-            raise FileNotFoundError("macOS sandbox-exec is unavailable")
+        system = platform.system()
+        if system == "Linux":
+            self.sandbox_backend = "Landlock/seccomp"
+        elif system == "Darwin":
+            if not Path("/usr/bin/sandbox-exec").is_file():
+                raise FileNotFoundError("macOS sandbox-exec is unavailable")
+            self.sandbox_backend = "Seatbelt"
+        else:
+            raise RuntimeError(f"unsupported sandbox platform: {system}")
         workspace_path = workspace.expanduser().resolve(strict=True)
         if not workspace_path.is_dir():
             raise ValueError(f"workspace is not a directory: {workspace_path}")
@@ -53,9 +61,29 @@ class OverallsEnvironment(LocalEnvironment):
         self._temporary_directory = tempfile.TemporaryDirectory(prefix="bub-overalls-")
         self.temporary_path = Path(self._temporary_directory.name).resolve()
         try:
-            self._sandbox_profile = build_overalls_profile(
-                config, workspace_path, self.temporary_path, git_paths=self.git_paths
-            )
+            if system == "Darwin":
+                profile = build_overalls_profile(
+                    config,
+                    workspace_path,
+                    self.temporary_path,
+                    git_paths=self.git_paths,
+                )
+                self._sandbox_prefix = ["/usr/bin/sandbox-exec", "-p", profile]
+            else:
+                policy = build_overalls_landlock_policy(
+                    config,
+                    workspace_path,
+                    self.temporary_path,
+                    git_paths=self.git_paths,
+                )
+                self._sandbox_prefix = [
+                    str(Path(self.python).resolve()),
+                    "-I",
+                    "-S",
+                    "-c",
+                    _LAUNCHER_SOURCE,
+                    policy.serialize(),
+                ]
         except BaseException:
             self._temporary_directory.cleanup()
             raise
@@ -64,7 +92,7 @@ class OverallsEnvironment(LocalEnvironment):
 
     @classmethod
     async def create(cls, config: OverallsConfig, workspace: Path) -> Self:
-        """Create an environment whose Seatbelt preflight has succeeded."""
+        """Create an environment whose sandbox preflight has succeeded."""
         return await cls(config, workspace).__aenter__()
 
     async def __aenter__(self) -> Self:
@@ -80,7 +108,7 @@ class OverallsEnvironment(LocalEnvironment):
             )
             if returncode:
                 raise RuntimeError(
-                    f"Seatbelt preflight failed ({returncode}): "
+                    f"{self.sandbox_backend} preflight failed ({returncode}): "
                     f"{stderr.decode(errors='replace')}"
                 )
         except BaseException:
@@ -113,10 +141,17 @@ class OverallsEnvironment(LocalEnvironment):
         )
         if not argv:
             raise ValueError("command cannot be empty")
+        process_env = self._build_process_env(env)
+        if self.sandbox_backend == "Landlock/seccomp":
+            # Loader/Python overrides belong to the target after confinement, not
+            # to the trusted bootstrap. Keep target settings out of argv/ps output.
+            target_env = json.dumps(process_env)
+            process_env = self._build_process_env(None)
+            process_env["_BUB_OVERALLS_TARGET_ENV"] = target_env
         return await self._process_manager.spawn(
-            ["/usr/bin/sandbox-exec", "-p", self._sandbox_profile, *argv],
+            [*self._sandbox_prefix, *argv],
             cwd=cwd or self.workspace,
-            env=self._build_process_env(env),
+            env=process_env,
         )
 
     def _build_process_env(self, overrides: Mapping[str, str] | None) -> dict[str, str]:

@@ -155,7 +155,7 @@ async def test_doctor_initializes_and_closes_sandbox(
 ) -> None:
     caplog.set_level(logging.INFO, logger=cli.__name__)
     assert await cli.check_sandbox() == 0
-    assert caplog.messages == ["Seatbelt preflight passed (macOS; network disabled)."]
+    assert caplog.messages == ["Seatbelt preflight passed (network disabled)."]
 
 
 @pytest.mark.sandbox

@@ -1,8 +1,13 @@
 # Configuration and sandbox boundaries
 
-Overalls runs Bub commands and file operations through macOS Seatbelt, using
-installed tools directly. Linux support will use Landlock; it is not implemented
-yet. Initialization and preflight failures never select host execution.
+Overalls runs Bub commands and file operations through macOS Seatbelt, or
+experimental Linux Landlock, seccomp, and private read-only mounts, using
+installed tools directly.
+Initialization and preflight failures never select host execution.
+
+**The policy details below describe macOS.** Linux is selected automatically and
+cannot match the protected-name, selective Git, metadata, IPC, or enabled-network
+policy. Read the [Linux comparison](landlock.md) before use.
 
 ## Configuration
 
@@ -41,7 +46,7 @@ it changes neither permissions nor stored history. No skill installation is need
 To select sessions, use e.g. `BUB_OVERALLS_SESSIONS='["cli_session", "cli:*"]'`.
 `cli_session` is the default for `bub chat`; `cli:*` covers `bub run`.
 An empty array matches none. **Excluded sessions may use Bub's host environment.**
-The standalone CLI always uses Seatbelt, regardless of session patterns.
+The standalone CLI always uses the platform sandbox, regardless of session patterns.
 
 ## Filesystem policy
 
@@ -131,7 +136,7 @@ async with OverallsEnvironment(OverallsConfig.from_env(), Path.cwd()) as environ
     await environment.write_text("example.txt", "hello")
 ```
 
-Context entry verifies Seatbelt. Normal close sends process groups `SIGTERM`,
+Context entry verifies the selected kernel sandbox. Normal close sends process groups `SIGTERM`,
 shares a 1-second grace period, then sends `SIGKILL`. Cancellation or exceptional
 exit kills immediately; cleanup completes before cancellation propagates.
 In-flight startup settles before session files are removed; process reaping is
@@ -154,7 +159,7 @@ Overalls installs neither global logging configuration nor signal handlers in Bu
 Only Bub `Environment` operations are confined. Other plugins, code-mode tool
 callbacks, MCP servers, and model requests have separate boundaries. Verify plugin
 discovery: Bub may tolerate discovery failures outside a framework turn.
-Children inherit Seatbelt, but deliberately detached processes can outlive cleanup;
+Children inherit the kernel restrictions, but deliberately detached processes can outlive cleanup;
 SIGKILL of the launcher prevents cleanup. There are no aggregate CPU/memory/PID
 limits or separate kernel. Sessions sharing a workspace see each other's writes.
 Apple deprecates `sandbox-exec`; profiles use private interfaces, so test macOS

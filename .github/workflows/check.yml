@@ -58,3 +58,34 @@ jobs:
       run: make test
     - name: Test Seatbelt
       run: make test-sandbox
+
+  linux:
+    name: Experimental Linux (${{ matrix.platform.arch }})
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+        - runner: ubuntu-24.04
+          arch: x86_64
+        - runner: ubuntu-24.04-arm
+          arch: aarch64
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Install uv
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      with:
+        enable-cache: true
+        ignore-nothing-to-cache: true
+        python-version: "3.12"
+    - name: Check architecture and kernel
+      env:
+        EXPECTED_ARCH: ${{ matrix.platform.arch }}
+      run: |
+        uname -a
+        uv run -- python -c 'import os, platform; assert platform.machine() == os.environ["EXPECTED_ARCH"], platform.machine()'
+    - name: Test portable policy construction
+      run: make test
+    - name: Test Landlock, seccomp and private mounts (ABI 6+ and user/mount/IPC/network namespaces required)
+      run: make test-sandbox

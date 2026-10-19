@@ -19,13 +19,21 @@ def supported_host(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("bub_overalls.process._TERMINATE_TIMEOUT_SECONDS", 0.01)
 
 
-def test_linux_is_explicitly_unsupported(
+async def test_linux_automatically_selects_confined_launcher(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr("platform.system", lambda: "Linux")
-    config = OverallsConfig()
-    with pytest.raises(RuntimeError, match="macOS only"):
-        OverallsEnvironment(config, tmp_path)
+    environment = OverallsEnvironment(OverallsConfig(), tmp_path)
+    spawn = AsyncMock()
+    monkeypatch.setattr(environment._process_manager, "spawn", spawn)
+    try:
+        await environment.spawn(["/usr/bin/true"])
+        command = spawn.call_args.args[0]
+        assert environment.sandbox_backend == "Landlock/seccomp"
+        assert command[1:4] == ["-I", "-S", "-c"]
+        assert command[-1] == "/usr/bin/true"
+    finally:
+        await environment.close()
 
 
 def test_missing_sandbox_exec_is_rejected(

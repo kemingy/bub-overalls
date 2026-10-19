@@ -21,15 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 async def check_sandbox(network_access: bool | None = None) -> int:
-    """Verify macOS accepts the profile and starts a sandboxed process."""
+    """Verify the platform sandbox starts a confined process."""
     config = OverallsConfig.from_env(network_access=network_access)
     with tempfile.TemporaryDirectory(
         prefix="bub-overalls-check-"
     ) as temporary_directory:
-        async with OverallsEnvironment(config, Path(temporary_directory)):
+        async with OverallsEnvironment(
+            config, Path(temporary_directory)
+        ) as environment:
             network_status = "enabled" if config.network_access else "disabled"
             logger.info(
-                "Seatbelt preflight passed (macOS; network %s).", network_status
+                "%s preflight passed (network %s).",
+                environment.sandbox_backend,
+                network_status,
             )
     return 0
 
@@ -180,7 +184,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         format="%(levelname)s: %(message)s",
         handlers=[_OverallsLogHandler()],
     )
-    parser = argparse.ArgumentParser(description="Run Bub tools inside macOS Seatbelt.")
+    parser = argparse.ArgumentParser(
+        description="Run Bub tools inside Seatbelt or experimental Linux Landlock."
+    )
     subparsers = parser.add_subparsers(dest="action", required=True)
     doctor_parser = subparsers.add_parser(
         "doctor", help="verify actual sandbox initialization"

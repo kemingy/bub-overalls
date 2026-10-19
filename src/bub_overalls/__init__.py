@@ -1,4 +1,4 @@
-"""Native macOS sandbox environments for Bub."""
+"""Seatbelt and experimental Linux Landlock sandbox environments for Bub."""
 
 import logging
 
