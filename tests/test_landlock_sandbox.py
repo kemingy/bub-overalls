@@ -195,6 +195,16 @@ async def test_linux_signal_scope_and_async_runtime(
     assert not environment.temporary_path.exists()
 
 
+async def test_linux_process_memory_syscalls_are_denied(
+    linux_environment: OverallsEnvironment,
+) -> None:
+    returncode, stdout, stderr = await run_command(
+        linux_environment,
+        _build_probe_command(linux_environment, "deny_process_vm.py"),
+    )
+    assert (returncode, stdout, stderr) == (0, b"", b"")
+
+
 async def test_linux_explicit_read_and_write_roots(tmp_path: Path) -> None:
     workspace, read, write = (tmp_path / name for name in ("work", "read", "write"))
     for path in (workspace, read, write):

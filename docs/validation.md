@@ -1,13 +1,13 @@
 # Validation
 
-Local results recorded on 2026-10-19: macOS ARM64 (Darwin 25.6.0), Python 3.13.14,
+Local results recorded on 2026-10-20: macOS ARM64 (Darwin 25.6.0), Python 3.14.3,
 and released Bub 0.5.1. These results do not establish support for other hosts.
 
 | Command | Result |
 | --- | --- |
 | `make check` | Lockfile, Ruff format/lint, and strict mypy pass |
-| `make test` | 185 unit tests pass, including portable Linux policy/launcher checks |
-| `make test-sandbox` | 79 real Seatbelt tests pass; 29 Linux tests skipped |
+| `make test` | 189 unit tests pass, including portable Linux policy/launcher checks |
+| `make test-sandbox` | 79 real Seatbelt tests pass; 33 Linux tests skipped |
 | `make package` | Wheel and source distribution build |
 
 Earlier package inspection (2026-10-18) also verified CLI/plugin entry points, the typed marker,
@@ -35,10 +35,11 @@ Portable checks and skipped tests do not establish kernel enforcement. See the
 Security regressions use inert writes rather than host-executed payloads.
 A separate manual check verified DNS and HTTPS with networking enabled.
 
-## OrbStack Linux validation
+## Earlier OrbStack Linux validation
 
-Executed in the existing OrbStack 2.2.4 Ubuntu guest on this Mac, using a separate
-checkout on the guest's native `/tmp` filesystem. No Docker container was needed.
+Executed for an earlier revision in an OrbStack 2.2.4 Ubuntu guest on this Mac,
+using a separate checkout on the guest's native `/tmp` filesystem. No Docker
+container was needed.
 Guest: Ubuntu resolute, aarch64, Python 3.14.4, Bub 0.5.1; kernel
 `7.2.9-orbstack-00391-g2b298d05fbd4`, Landlock ABI 10. The launcher still handles
 only rights through ABI 6. These results do not establish x86_64 Linux, other
@@ -52,7 +53,9 @@ kernel configurations, or macOS-shared-filesystem compatibility.
 
 The current results use automatic platform selection with the former Linux
 enablement environment variable unset. Missing/old Landlock ABIs and namespace
-setup failures remain covered by portable fail-closed tests.
+setup failures remain covered by portable fail-closed tests. The current suite
+also covers cross-process memory/comparison syscall denial and real Linux CLI
+`doctor`, `exec`, and stalled-stderr signal cleanup.
 
 Real Linux tests cover content grants, networking off/on (TCP/UDP IPv4/IPv6),
 Unix-socket denial, explicit listener denial, signals, symlink grant replacement,
@@ -106,16 +109,16 @@ explains each enforcement component's role and the alternative designs.
 ## CI
 
 The [workflow](../.github/workflows/check.yml) runs shared lint, type checks,
-lockfile validation, and package builds once on Ubuntu 24.04 with Python 3.12.
+lockfile validation, and package builds once on Ubuntu 26.04 with Python 3.12.
 Unit and real sandbox tests run across Python 3.12–3.14 on all four runners:
-macOS 15 Intel (`macos-15-intel`) and ARM64 (`macos-15`), and Ubuntu 24.04
-x86_64 (`ubuntu-24.04`) and aarch64 (`ubuntu-24.04-arm`). These twelve jobs
+macOS 15 Intel (`macos-15-intel`) and ARM64 (`macos-15`), and Ubuntu 26.04
+x86_64 (`ubuntu-26.04`) and aarch64 (`ubuntu-26.04-arm`). These twelve jobs
 verify their Python architecture and run Seatbelt or Landlock tests according
 to the platform markers.
 Triggers: pushes to `main`, PRs targeting `main`, and manual dispatch.
 Consult CI runs for hosted results; the local counts above are separate evidence.
 The experimental Linux jobs run real Landlock/seccomp/private-mount tests.
 Their host kernels must expose ABI 6+ and permit the required unprivileged
-namespaces: Linux tests fail if required features are unavailable. These workflow
-changes have not run on GitHub-hosted runners here. See [sandbox boundaries](sandbox.md) and the
-[Linux comparison](landlock.md) for remaining limits.
+namespaces: Linux tests fail if required features are unavailable.
+See [sandbox boundaries](sandbox.md) and the [Linux comparison](landlock.md)
+for remaining limits.

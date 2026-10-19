@@ -33,7 +33,7 @@ _LINUX_POLICY = (
     "Network sockets require network_access; Unix sockets and explicit IP "
     "listeners are denied. Enabled UDP can receive replies or unsolicited "
     "traffic on automatically assigned ports. Selective Git grants are unsupported. "
-    "See docs/landlock.md for limits. "
+    "See https://github.com/kemingy/bub-overalls/blob/main/docs/landlock.md for limits. "
 )
 _SEATBELT_POLICY = (
     "Bub Environment tools run under macOS Seatbelt; model/web/MCP tools "

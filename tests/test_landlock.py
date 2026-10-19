@@ -77,6 +77,18 @@ def test_unknown_architecture_is_rejected() -> None:
         _linux._get_syscalls("riscv64")
 
 
+def test_file_identity_ignores_timestamp_changes(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.write_text("first")
+    second.write_text("second")
+    before = first.stat()
+    os.utime(first, (before.st_atime + 1, before.st_mtime + 1))
+    after = first.stat()
+    assert _linux._same_file(before, after)
+    assert not _linux._same_file(after, second.stat())
+
+
 @pytest.mark.parametrize("abi", [-1, 0, 1, 3, 5])
 def test_old_or_unavailable_kernel_fails_before_restriction(
     abi: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -180,6 +192,32 @@ def test_launcher_failure_does_not_exec_target(monkeypatch: pytest.MonkeyPatch) 
     execute = Mock()
     monkeypatch.setattr("bub_overalls._linux.os.execvpe", execute)
     assert _linux._main() == 125
+    execute.assert_not_called()
+
+
+@pytest.mark.parametrize("payload", ["{}", "[]"])
+def test_launcher_rejects_malformed_policy(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], payload: str
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["launcher", payload, "/bin/true"])
+    execute = Mock()
+    monkeypatch.setattr("bub_overalls._linux.os.execvpe", execute)
+    assert _linux._main() == 125
+    assert "Landlock/seccomp launcher failed" in capsys.readouterr().err
+    execute.assert_not_called()
+
+
+def test_launcher_missing_target_env_is_concise(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    policy = _linux.OverallsLandlockPolicy((), (), False)
+    monkeypatch.setattr(sys, "argv", ["launcher", policy.serialize(), "/bin/true"])
+    monkeypatch.setattr(_linux, "_restrict", lambda _: None)
+    monkeypatch.delenv("_BUB_OVERALLS_TARGET_ENV", raising=False)
+    execute = Mock()
+    monkeypatch.setattr("bub_overalls._linux.os.execvpe", execute)
+    assert _linux._main() == 125
+    assert "Landlock/seccomp launcher failed" in capsys.readouterr().err
     execute.assert_not_called()
 
 

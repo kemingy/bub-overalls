@@ -198,6 +198,9 @@ def _get_syscalls(machine: str) -> _OverallsSyscalls:
                 50,  # listen
                 288,  # accept4
                 101,  # ptrace
+                310,  # process_vm_readv
+                311,  # process_vm_writev
+                312,  # kcmp
                 165,  # mount
                 166,  # umount2
                 272,  # unshare
@@ -215,6 +218,9 @@ def _get_syscalls(machine: str) -> _OverallsSyscalls:
                 202,  # accept
                 242,  # accept4
                 117,  # ptrace
+                270,  # process_vm_readv
+                271,  # process_vm_writev
+                272,  # kcmp
                 40,  # mount
                 39,  # umount2
                 97,  # unshare
@@ -271,6 +277,10 @@ def _check_result(result: int) -> int:
     return result
 
 
+def _same_file(left: os.stat_result, right: os.stat_result) -> bool:
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
 def _open_path(libc: ctypes.CDLL, path: Path, *, directory: bool = False) -> int:
     flags = os.O_RDONLY | os.O_DIRECTORY if directory else _O_PATH
     how = _OpenHow(flags | os.O_CLOEXEC, 0, _RESOLVE_NO_SYMLINKS)
@@ -309,7 +319,7 @@ def _find_protected_paths(
                 seen.add(identity)
                 directory = _open_path(libc, path, directory=True)
                 try:
-                    if os.fstat(directory) != os.fstat(descriptor):
+                    if not _same_file(os.fstat(directory), os.fstat(descriptor)):
                         raise RuntimeError(f"directory changed while scanning: {path}")
                     with os.scandir(directory) as entries:
                         for entry in entries:
@@ -422,7 +432,7 @@ def _protect_path(libc: ctypes.CDLL, path: Path, descriptor: int) -> None:
     """Attach a read-only mount, checking its identity before and after setup."""
     current = _open_path(libc, path)
     try:
-        if os.fstat(current) != os.fstat(descriptor):
+        if not _same_file(os.fstat(current), os.fstat(descriptor)):
             raise RuntimeError(f"protected path changed while scanning: {path}")
     finally:
         os.close(current)
@@ -430,7 +440,7 @@ def _protect_path(libc: ctypes.CDLL, path: Path, descriptor: int) -> None:
     current = _open_path(libc, path)
     try:
         if (
-            os.fstat(current) != os.fstat(descriptor)
+            not _same_file(os.fstat(current), os.fstat(descriptor))
             or not os.fstatvfs(current).f_flag & os.ST_RDONLY
         ):
             raise RuntimeError(f"read-only mount verification failed: {path}")
@@ -562,7 +572,7 @@ def _main() -> int:
         _restrict(policy)
         target_env = json.loads(os.environ.pop("_BUB_OVERALLS_TARGET_ENV"))
         os.execvpe(sys.argv[2], sys.argv[2:], target_env)
-    except (OSError, RuntimeError, ValueError) as error:
+    except (KeyError, OSError, RuntimeError, TypeError, ValueError) as error:
         print(f"Landlock/seccomp launcher failed: {error}", file=sys.stderr)
         return 125
 
