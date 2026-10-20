@@ -119,6 +119,10 @@ Triggers: pushes to `main`, PRs targeting `main`, and manual dispatch.
 Consult CI runs for hosted results; the local counts above are separate evidence.
 The experimental Linux jobs run real Landlock/seccomp/private-mount tests.
 Their host kernels must expose ABI 6+ and permit the required unprivileged
-namespaces: Linux tests fail if required features are unavailable.
+namespaces: Linux tests fail if required features are unavailable. Ubuntu
+restricts unprivileged user namespaces through AppArmor by default, so the
+workflow sets `kernel.apparmor_restrict_unprivileged_userns=0` on the
+disposable runner before testing; this relaxes nothing inside the sandbox
+itself.
 See [sandbox boundaries](sandbox.md) and the [Linux comparison](landlock.md)
 for remaining limits.
