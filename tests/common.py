@@ -1,6 +1,20 @@
 import asyncio
+from pathlib import Path
 
 from bub_overalls import OverallsEnvironment
+
+
+async def read_pid_pair(path: Path, timeout: float = 30.0) -> list[int]:
+    """Poll until the file holds two complete PIDs, tolerating partial writes."""
+    async with asyncio.timeout(timeout):
+        while True:
+            try:
+                pids = [int(value) for value in path.read_text().split()]
+            except (OSError, ValueError):
+                pids = []
+            if len(pids) == 2:
+                return pids
+            await asyncio.sleep(0.05)
 
 
 async def run_command(

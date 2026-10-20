@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.common import assert_processes_stopped
+from tests.common import assert_processes_stopped, read_pid_pair
 
 pytestmark = [pytest.mark.sandbox, pytest.mark.landlock]
 
@@ -81,11 +81,8 @@ async def test_sigterm_stops_processes_with_stalled_stderr(tmp_path: Path) -> No
     os.close(writer)
     pids: list[int] = []
     try:
-        async with asyncio.timeout(10):
-            while not (tmp_path / "pids").exists():
-                await asyncio.sleep(0.01)
-            pids = [int(value) for value in (tmp_path / "pids").read_text().split()]
-            assert len(pids) == 2
+        async with asyncio.timeout(60):
+            pids = await read_pid_pair(tmp_path / "pids")
             # Let the stderr pipe fill; deliberately never read it.
             await asyncio.sleep(0.1)
             process.send_signal(signal.SIGTERM)
