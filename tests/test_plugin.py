@@ -96,6 +96,7 @@ async def test_plugin_preflights_selected_session(
 ) -> None:
     monkeypatch.setenv("BUB_OVERALLS_NETWORK_ACCESS", "true")
     environment = Mock(spec=OverallsEnvironment)
+    environment.sandbox_backend = "Seatbelt"
     create = AsyncMock(return_value=environment)
     monkeypatch.setattr(OverallsEnvironment, "create", create)
     caplog.set_level(logging.INFO, logger=plugin.__name__)
@@ -277,7 +278,29 @@ async def test_documented_session_selection_sandboxes_cli_channels(
     setting = guide.split("BUB_OVERALLS_SESSIONS='", 1)[1].split("'", 1)[0]
     monkeypatch.setenv("BUB_OVERALLS_SESSIONS", setting)
     environment = Mock(spec=OverallsEnvironment)
+    environment.sandbox_backend = "Seatbelt"
     create = AsyncMock(return_value=environment)
     monkeypatch.setattr(OverallsEnvironment, "create", create)
     assert await plugin.provide_environment(session_id, tmp_path) is environment
     create.assert_awaited_once()
+
+
+async def test_linux_prompt_discloses_mount_protection_and_future_name_gap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    environment = OverallsEnvironment(OverallsConfig(), tmp_path)
+    request = LlmCallRequest(run_id="test", model="test:model", messages=[])
+    try:
+        updated = plugin.before_llm_call(request, {ENVIRONMENT_STATE_KEY: environment})
+        assert updated is not None
+        content = str(updated.messages[0]["content"])
+        assert "private read-only mounts" in content
+        assert "mounted read-only at each command startup" in content
+        assert "Names created during a command remain writable" in content
+        assert "unresolved nested Git pointers" in content
+        assert "private System V/POSIX message-queue IPC" in content
+        assert "private network namespace" in content
+        assert "unsolicited" in content
+    finally:
+        await environment.close()

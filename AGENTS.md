@@ -1,8 +1,13 @@
 # Repository instructions
 
-- Use macOS `/usr/bin/sandbox-exec`. No Homebrew, VM, or native build.
-- Linux is unsupported. Initialization failures must never select host execution.
-- Every Environment command and file operation must pass through Seatbelt.
+- Use macOS `/usr/bin/sandbox-exec`, or experimental Linux Landlock plus seccomp
+  selected automatically by platform. No Homebrew or native build. Use the existing OrbStack
+  Ubuntu guest for Linux validation in a separate native-filesystem test copy.
+- Linux requires Landlock ABI 6+, native x86_64/aarch64, seccomp, unprivileged
+  user/mount/IPC namespaces, a network namespace when offline, and the modern
+  mount API. Initialization
+  failures must never select host execution. Document gaps in docs/landlock.md.
+- Every Environment command and file operation must pass through its kernel sandbox.
 - Keep networking disabled by default. Explicit opt-in permits outbound IP and
   the DNS resolver socket; verify actual allowed and denied operations. Do not
   imply domain filtering or approval/escalation support.

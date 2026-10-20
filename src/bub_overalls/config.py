@@ -1,4 +1,4 @@
-"""Explicit filesystem and network grants for the macOS sandbox."""
+"""Explicit filesystem and network grants for the platform sandbox."""
 
 import json
 import os

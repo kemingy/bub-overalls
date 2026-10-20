@@ -10,12 +10,14 @@ from bub_overalls import OverallsConfig, OverallsEnvironment
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    if platform.system() == "Darwin" and os.environ.get("BUB_OVERALLS_TEST") == "1":
-        return
-    skip_sandbox = pytest.mark.skip(reason="requires macOS and BUB_OVERALLS_TEST=1")
     for item in items:
-        if "sandbox" in item.keywords:
-            item.add_marker(skip_sandbox)
+        if "sandbox" not in item.keywords:
+            continue
+        system = "Linux" if "landlock" in item.keywords else "Darwin"
+        if platform.system() != system or os.environ.get("BUB_OVERALLS_TEST") != "1":
+            item.add_marker(
+                pytest.mark.skip(reason=f"requires {system} and BUB_OVERALLS_TEST=1")
+            )
 
 
 @pytest_asyncio.fixture

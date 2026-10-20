@@ -1,7 +1,7 @@
 [project]
 name = "bub-overalls"
 dynamic = ["version"]
-description = "A macOS Seatbelt sandbox plugin for Bub."
+description = "Seatbelt and experimental Linux Landlock sandbox environments for Bub."
 readme = "README.md"
 license = "Apache-2.0"
 # Bub's Environment API requires Python 3.12 or newer.
@@ -64,4 +64,7 @@ follow_untyped_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-markers = ["sandbox: requires actual macOS Seatbelt execution"]
+markers = [
+    "sandbox: requires actual kernel sandbox execution",
+    "landlock: requires Linux Landlock ABI 6+, seccomp and required namespaces",
+]

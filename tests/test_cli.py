@@ -11,7 +11,7 @@ from unittest.mock import Mock
 import pytest
 
 from bub_overalls import main as cli
-from tests.common import assert_processes_stopped
+from tests.common import assert_processes_stopped, read_pid_pair
 
 
 def test_imports_preserve_host_logging() -> None:
@@ -155,7 +155,7 @@ async def test_doctor_initializes_and_closes_sandbox(
 ) -> None:
     caplog.set_level(logging.INFO, logger=cli.__name__)
     assert await cli.check_sandbox() == 0
-    assert caplog.messages == ["Seatbelt preflight passed (macOS; network disabled)."]
+    assert caplog.messages == ["Seatbelt preflight passed (network disabled)."]
 
 
 @pytest.mark.sandbox
@@ -230,7 +230,7 @@ async def test_cli_cleans_process_group_on_signal_or_timeout(
         "--workspace",
         str(tmp_path),
         "--timeout",
-        "0.5" if signum is None else "30",
+        "5" if signum is None else "30",
         "--",
         sys.executable,
         "-I",
@@ -244,9 +244,16 @@ async def test_cli_cleans_process_group_on_signal_or_timeout(
     )
     pids: list[int] = []
     try:
-        async with asyncio.timeout(10):
+        async with asyncio.timeout(60):
             assert process.stdout is not None
-            pids = [int(value) for value in (await process.stdout.readline()).split()]
+            line = await process.stdout.readline()
+            if not line.split():
+                assert process.stderr is not None
+                raise AssertionError(
+                    f"missing pid line (exit {process.returncode}): "
+                    f"{await process.stderr.read()!r}"
+                )
+            pids = [int(value) for value in line.split()]
             assert len(pids) == 2
             if signum is not None:
                 process.send_signal(signum)
@@ -357,7 +364,7 @@ async def test_cli_stops_processes_with_stalled_output_consumer(
         "--workspace",
         str(tmp_path),
         "--timeout",
-        "0.7" if signum is None else "30",
+        "5" if signum is None else "30",
         "--",
         sys.executable,
         "-I",
@@ -370,11 +377,8 @@ async def test_cli_stops_processes_with_stalled_output_consumer(
     os.close(writer)
     pids: list[int] = []
     try:
-        async with asyncio.timeout(10):
-            while not (tmp_path / "pids").exists():
-                await asyncio.sleep(0.01)
-            pids = [int(value) for value in (tmp_path / "pids").read_text().split()]
-            assert len(pids) == 2
+        async with asyncio.timeout(60):
+            pids = await read_pid_pair(tmp_path / "pids")
             # Let the output pipe fill; deliberately never read it.
             await asyncio.sleep(0.1)
             if signum is not None:
